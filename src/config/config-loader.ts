@@ -40,11 +40,40 @@ export class ConfigLoader {
     try {
       const configPath = path.join(process.cwd(), 'config', 'prompts.json');
       const configData = fs.readFileSync(configPath, 'utf-8');
-      this.promptConfig = JSON.parse(configData) as PromptConfig;
+      const rawConfig = JSON.parse(configData);
+
+      // Load template files and replace paths with actual content
+      this.promptConfig = {
+        summarization: {
+          systemPrompt: this.loadTemplateFile(
+            rawConfig.summarization.systemPrompt
+          ),
+          userPrompt: this.loadTemplateFile(rawConfig.summarization.userPrompt),
+        },
+        postGeneration: {
+          systemPrompt: this.loadTemplateFile(
+            rawConfig.postGeneration.systemPrompt
+          ),
+          userPrompt: this.loadTemplateFile(
+            rawConfig.postGeneration.userPrompt
+          ),
+        },
+      };
+
       return this.promptConfig;
     } catch (error) {
       console.error('Error loading prompt config:', error);
       throw new Error('Failed to load prompt configuration');
+    }
+  }
+
+  private loadTemplateFile(templatePath: string): string {
+    try {
+      const fullPath = path.join(process.cwd(), 'config', templatePath);
+      return fs.readFileSync(fullPath, 'utf-8').trim();
+    } catch (error) {
+      console.error(`Error loading template file ${templatePath}:`, error);
+      throw new Error(`Failed to load template file: ${templatePath}`);
     }
   }
 
