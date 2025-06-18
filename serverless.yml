@@ -1,0 +1,55 @@
+service: tg-news-summarizer
+
+frameworkVersion: '3'
+
+useDotenv: true
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: ${env:AWS_REGION, 'us-east-1'}
+  stage: ${env:STAGE, 'dev'}
+  timeout: 900 # 15 minutes
+  memorySize: 512
+  environment:
+    STAGE: ${self:provider.stage}
+    MONGODB_URI: ${env:MONGODB_URI}
+    CLAUDE_API_KEY: ${env:CLAUDE_API_KEY}
+    TELEGRAM_BOT_TOKEN: ${env:TELEGRAM_BOT_TOKEN}
+    TELEGRAM_API_ID: ${env:TELEGRAM_API_ID}
+    TELEGRAM_API_HASH: ${env:TELEGRAM_API_HASH}
+    TELEGRAM_SESSION_STRING: ${env:TELEGRAM_SESSION_STRING}
+    TARGET_CHANNEL_ID: ${env:TARGET_CHANNEL_ID}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - logs:CreateLogGroup
+        - logs:CreateLogStream
+        - logs:PutLogEvents
+      Resource: 'arn:aws:logs:*:*:*'
+
+functions:
+  newsProcessor:
+    handler: dist/handler.processNews
+    events:
+      - schedule:
+          rate: ${env:SCHEDULE_RATE, 'cron(0 8 * * ? *)'} # Default: 8 AM UTC daily
+          enabled: true
+
+plugins:
+  - serverless-offline
+
+package:
+  patterns:
+    - '!src/**'
+    - '!.git/**'
+    - '!README.md'
+    - '!.env*'
+    - '!jest.config.js'
+    - '!tsconfig.json'
+    - '!.serverless/**'
+    - '!scripts/**'
+    - '!**/*.test.ts'
+    - '!**/*.spec.ts'
+    - 'dist/**'
+    - 'node_modules/**'

@@ -1,0 +1,33 @@
+{
+  "channels": [
+    {
+      "id": "@times_ukraina",
+      "name": "Times of Ukraine: Новини | Україна",
+      "enabled": true,
+      "category": "general"
+    },
+    {
+      "id": "@David_Arakhamia",
+      "name": "David Arakhamia",
+      "enabled": true,
+      "category": "general"
+    },
+    {
+      "id": "@TCH_channel",
+      "name": "TCH Channel",
+      "enabled": true,
+      "category": "general"
+    },
+    {
+      "id": "@znajua_channel",
+      "name": "znajua_channel",
+      "enabled": true,
+      "category": "general"
+    }
+  ],
+  "settings": {
+    "maxPostsPerChannel": 50,
+    "hoursBack": 24,
+    "minPostLength": 100
+  }
+}
