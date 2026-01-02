@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc",
     "deploy": "npm run build && serverless deploy",
-    "deploy:prod": "npm run build && STAGE=prod serverless deploy",
+    "deploy:prod": "npm run build && serverless deploy --stage prod",
     "remove": "serverless remove",
     "dev": "npm run build && serverless offline",
     "test": "jest",

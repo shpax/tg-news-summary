@@ -47,6 +47,6 @@ export function renderTelegramPostWithLink(
 
 ${summary}
 
-📖 [Читати повну версію на Telegraph](${telegraphUrl})
+📖 [Що ще сталося сьогодні? Читати повний огляд](${telegraphUrl})
 `;
 }
