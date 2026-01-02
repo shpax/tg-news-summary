@@ -6,11 +6,9 @@ useDotenv: true
 
 provider:
   name: aws
-  runtime: nodejs18.x
+  runtime: nodejs20.x
   region: ${env:AWS_REGION, 'us-east-1'}
   stage: ${env:STAGE, 'dev'}
-  timeout: 900 # 15 minutes
-  memorySize: 512
   environment:
     STAGE: ${self:provider.stage}
     MONGODB_URI: ${env:MONGODB_URI}
@@ -20,23 +18,216 @@ provider:
     TELEGRAM_API_HASH: ${env:TELEGRAM_API_HASH}
     TELEGRAM_SESSION_STRING: ${env:TELEGRAM_SESSION_STRING}
     TARGET_CHANNEL_ID: ${env:TARGET_CHANNEL_ID}
-  iamRoleStatements:
-    - Effect: Allow
-      Action:
-        - logs:CreateLogGroup
-        - logs:CreateLogStream
-        - logs:PutLogEvents
-      Resource: 'arn:aws:logs:*:*:*'
+    TARGET_CHANNEL_NAME: ${env:TARGET_CHANNEL_NAME, 'Новини України'}
+    TELEGRAPH_ACCESS_TOKEN: ${env:TELEGRAPH_ACCESS_TOKEN}
+    TELEGRAPH_AUTHOR_NAME: ${env:TELEGRAPH_AUTHOR_NAME, ''}
+    TELEGRAPH_AUTHOR_URL: ${env:TELEGRAPH_AUTHOR_URL, ''}
+  iam:
+    role:
+      statements:
+        # CloudWatch Logs
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: 'arn:aws:logs:*:*:*'
 
 functions:
-  newsProcessor:
-    handler: dist/handler.processNews
-    events:
-      - schedule:
-          rate: ${env:SCHEDULE_RATE, 'cron(0 8 * * ? *)'} # Default: 8 AM UTC daily
-          enabled: true
+  collectNews:
+    handler: dist/handlers/collect-news.handler
+    timeout: 180 # 3 minutes
+    memorySize: 512
+    description: 'Collect news from Telegram channels and save to MongoDB'
+    environment:
+      FUNCTION_NAME: collectNews
+
+  summarizeNews:
+    handler: dist/handlers/summarize-news.handler
+    timeout: 300 # 5 minutes
+    memorySize: 512
+    description: 'Generate AI summary and Telegram post from collected news'
+    environment:
+      FUNCTION_NAME: summarizeNews
+
+  publishNews:
+    handler: dist/handlers/publish-news.handler
+    timeout: 180 # 3 minutes (increased for Telegraph API)
+    memorySize: 256
+    description: 'Publish summary to Telegraph and Telegram, update MongoDB'
+    environment:
+      FUNCTION_NAME: publishNews
+
+stepFunctions:
+  stateMachines:
+    newsWorkflow:
+      name: ${self:service}-${self:provider.stage}-workflow
+      definition:
+        Comment: 'News Collection, Summarization, and Publishing Workflow'
+        StartAt: CollectNews
+        States:
+          CollectNews:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            Parameters:
+              FunctionName:
+                Fn::GetAtt: [collectNews, Arn]
+              Payload.$: '$'
+            ResultSelector:
+              output.$: '$.Payload'
+            ResultPath: '$.collectResult'
+            Retry:
+              - ErrorEquals:
+                  - States.TaskFailed
+                  - Lambda.ServiceException
+                  - Lambda.TooManyRequestsException
+                IntervalSeconds: 30
+                MaxAttempts: 2
+                BackoffRate: 2.0
+            Catch:
+              - ErrorEquals:
+                  - States.ALL
+                ResultPath: '$.error'
+                Next: NotifyCollectionFailure
+            Next: CheckPostsCollected
+
+          CheckPostsCollected:
+            Type: Choice
+            Choices:
+              - Variable: '$.collectResult.output.status'
+                StringEquals: 'no_posts'
+                Next: SuccessNoPostsToProcess
+              - Variable: '$.collectResult.output.filteredPostsCount'
+                NumericEquals: 0
+                Next: SuccessNoPostsToProcess
+            Default: SummarizeNews
+
+          SummarizeNews:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            Parameters:
+              FunctionName:
+                Fn::GetAtt: [summarizeNews, Arn]
+              Payload:
+                executionId.$: '$.collectResult.output.executionId'
+                postIds.$: '$.collectResult.output.postIds'
+                hoursBack.$: '$.collectResult.output.hoursBack'
+                timestamp.$: '$.collectResult.output.timestamp'
+            ResultSelector:
+              output.$: '$.Payload'
+            ResultPath: '$.summarizeResult'
+            Retry:
+              - ErrorEquals:
+                  - States.TaskFailed
+                  - Lambda.ServiceException
+                IntervalSeconds: 60
+                MaxAttempts: 1
+                BackoffRate: 1.5
+            Catch:
+              - ErrorEquals:
+                  - States.ALL
+                ResultPath: '$.error'
+                Next: NotifySummarizationFailure
+            Next: PublishNews
+
+          PublishNews:
+            Type: Task
+            Resource: arn:aws:states:::lambda:invoke
+            Parameters:
+              FunctionName:
+                Fn::GetAtt: [publishNews, Arn]
+              Payload:
+                executionId.$: '$.summarizeResult.output.executionId'
+                summaryId.$: '$.summarizeResult.output.summaryId'
+                timestamp.$: '$.summarizeResult.output.timestamp'
+            ResultSelector:
+              output.$: '$.Payload'
+            ResultPath: '$.publishResult'
+            Retry:
+              - ErrorEquals:
+                  - States.TaskFailed
+                  - Lambda.ServiceException
+                IntervalSeconds: 30
+                MaxAttempts: 2
+                BackoffRate: 1.5
+            Catch:
+              - ErrorEquals:
+                  - States.ALL
+                ResultPath: '$.error'
+                Next: NotifyPublishingFailure
+            Next: SuccessComplete
+
+          NotifyCollectionFailure:
+            Type: Task
+            Resource: arn:aws:states:::sns:publish
+            Parameters:
+              TopicArn:
+                Ref: WorkflowFailureNotificationTopic
+              Subject: 'News Workflow Failed: Collection Step'
+              Message: 'News workflow failed at Collection step. Check CloudWatch Logs for details: /aws/lambda/tg-news-summarizer-${self:provider.stage}-collectNews'
+            Next: FailedState
+
+          NotifySummarizationFailure:
+            Type: Task
+            Resource: arn:aws:states:::sns:publish
+            Parameters:
+              TopicArn:
+                Ref: WorkflowFailureNotificationTopic
+              Subject: 'News Workflow Failed: Summarization Step'
+              Message: 'News workflow failed at Summarization step. Posts are saved in MongoDB. Check CloudWatch Logs for details: /aws/lambda/tg-news-summarizer-${self:provider.stage}-summarizeNews'
+            Next: FailedState
+
+          NotifyPublishingFailure:
+            Type: Task
+            Resource: arn:aws:states:::sns:publish
+            Parameters:
+              TopicArn:
+                Ref: WorkflowFailureNotificationTopic
+              Subject: 'News Workflow Failed: Publishing Step'
+              Message: 'News workflow failed at Publishing step. Summary is saved in MongoDB. Check CloudWatch Logs for details: /aws/lambda/tg-news-summarizer-${self:provider.stage}-publishNews'
+            Next: FailedState
+
+          SuccessNoPostsToProcess:
+            Type: Succeed
+            Comment: 'Workflow completed successfully - no posts to process'
+
+          SuccessComplete:
+            Type: Succeed
+            Comment: 'Workflow completed successfully - news published'
+
+          FailedState:
+            Type: Fail
+            Error: 'WorkflowFailed'
+            Cause: 'See SNS notification and CloudWatch Logs for details'
+      events:
+        # CloudWatch Events trigger (replaces Lambda schedule)
+        - schedule:
+            rate: ${env:SCHEDULE_RATE, 'cron(0 15 * * ? *)'}
+            enabled: true
+            input:
+              executionId: 'scheduled-execution'
+              triggeredAt.$: '$.time'
+
+resources:
+  Resources:
+    # SNS Topic for failure notifications
+    WorkflowFailureNotificationTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: ${self:service}-${self:provider.stage}-workflow-failures
+        DisplayName: 'News Workflow Failure Notifications'
+
+    # SNS Subscription for failure notifications
+    WorkflowFailureNotificationSubscription:
+      Type: AWS::SNS::Subscription
+      Properties:
+        Protocol: email
+        Endpoint: ${env:NOTIFICATION_EMAIL}
+        TopicArn:
+          Ref: WorkflowFailureNotificationTopic
 
 plugins:
+  - serverless-step-functions
   - serverless-offline
 
 package:
@@ -53,3 +244,4 @@ package:
     - '!**/*.spec.ts'
     - 'dist/**'
     - 'node_modules/**'
+    - 'config/**'

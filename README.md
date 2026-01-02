@@ -8,6 +8,7 @@ An automated news summarization application that collects news from Telegram cha
 - 📰 **Multi-Channel Support**: Collects news from multiple Telegram channels
 - 🤖 **AI-Powered Summaries**: Uses Claude AI to generate intelligent summaries
 - 🇺🇦 **Ukrainian Language**: Generates summaries and posts in Ukrainian
+- 📝 **Telegraph Articles**: Publishes full summaries to Telegraph with proper formatting
 - 📊 **MongoDB Storage**: Stores collected posts and summaries
 - 🔧 **Configurable**: Channel lists and AI prompts are fully configurable
 - 🚀 **Serverless**: Deploys as AWS Lambda function via Serverless Framework
@@ -18,7 +19,7 @@ The application follows a modular architecture with abstract interfaces:
 
 - **News Sources**: Abstract interface for collecting news (currently supports Telegram)
 - **AI Service**: Claude AI integration for summarization
-- **Publishing Service**: Telegram Bot API for publishing posts
+- **Publishing Service**: Telegraph API for articles, Telegram Bot API for posts
 - **Storage Service**: MongoDB for data persistence
 - **Configuration**: JSON-based configuration for channels and prompts
 
@@ -39,7 +40,11 @@ The application follows a modular architecture with abstract interfaces:
 
    - MongoDB Atlas or self-hosted MongoDB instance
 
-4. **AWS**:
+4. **Telegraph**:
+
+   - Telegraph account and access token for article publishing
+
+5. **AWS**:
    - AWS account for Lambda deployment
    - AWS CLI configured
 
@@ -86,8 +91,13 @@ TELEGRAM_API_ID=your_api_id_here
 TELEGRAM_API_HASH=your_api_hash_here
 TELEGRAM_SESSION_STRING=your_session_string_here
 
+# Telegraph Configuration
+TELEGRAPH_ACCESS_TOKEN=your_telegraph_access_token_here
+TARGET_CHANNEL_NAME=Новини України  # Used as Telegraph article author name
+TELEGRAPH_AUTHOR_URL=  # Optional author URL
+
 # Schedule Configuration (optional, defaults to 8 AM UTC daily)
-SCHEDULE_RATE=cron(0 8 * * ? *)
+SCHEDULE_RATE=cron(0 15 * * ? *)
 
 # AWS Configuration (if needed)
 AWS_REGION=us-east-1
@@ -186,6 +196,48 @@ const rl = readline.createInterface({
 2. Create a new bot with `/newbot`
 3. Note down the bot token
 4. Add the bot to your target channel as an admin
+
+## Getting Telegraph Credentials
+
+Telegraph is used to publish full article versions of news summaries. Telegram posts will contain only a brief summary with a link to the Telegraph article.
+
+### Creating Telegraph Account
+
+You can create a Telegraph account via API:
+
+```bash
+curl https://api.telegra.ph/createAccount \
+  -d short_name="NewsBot" \
+  -d author_name="Новини України"
+```
+
+The response will include an `access_token`. Save this token - you'll need it for the `TELEGRAPH_ACCESS_TOKEN` environment variable.
+
+**Important**: Keep your access token secure. It provides full access to your Telegraph account.
+
+Example response:
+```json
+{
+  "ok": true,
+  "result": {
+    "short_name": "NewsBot",
+    "author_name": "Новини України",
+    "author_url": "",
+    "access_token": "abc123def456..."
+  }
+}
+```
+
+Copy the `access_token` value to your `.env` file.
+
+### How It Works
+
+1. **Collect**: News is collected from configured Telegram channels
+2. **Summarize**: Claude AI generates a structured summary with categories
+3. **Publish**:
+   - Full article (summary + all categories) is published to Telegraph
+   - Short post (summary + Telegraph link) is posted to Telegram channel
+4. **Users**: Can read brief summary in Telegram or click link for full article on Telegraph
 
 ## Development
 
@@ -290,6 +342,8 @@ export class MyAIService implements AIService {
 3. **Claude API Limits**: Monitor API usage and implement rate limiting
 4. **Lambda Timeout**: Increase timeout in serverless.yml
 5. **Missing Dependencies**: Run `npm install` after pulling changes
+6. **Telegraph API Errors**: Check access token validity and network connectivity
+7. **Telegraph Content Issues**: Verify content doesn't exceed Telegraph limits
 
 ### Logs
 

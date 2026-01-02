@@ -1,10 +1,6 @@
 {
   "summarization": {
     "systemPrompt": "templates/summarization-system.txt",
-    "userPrompt": "templates/summarization-user.txt"
-  },
-  "postGeneration": {
-    "systemPrompt": "templates/post-generation-system.txt",
-    "userPrompt": "templates/post-generation-user.txt"
+    "userPrompt": "templates/summarization-structured.txt"
   }
 }

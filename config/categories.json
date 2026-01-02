@@ -1,0 +1,74 @@
+{
+  "categories": [
+    {
+      "id": "war_updates",
+      "title_uk": "Воєнні дії",
+      "title_en": "War Updates",
+      "icon": "⚔️",
+      "description": "Military operations including Russian attacks on Ukraine, casualty reports, air defense performance, and Ukrainian counter-strikes on Russian territory."
+    },
+    {
+      "id": "peace_negotiations",
+      "title_uk": "Переговори та дипломатія",
+      "title_en": "Peace Negotiations & Diplomacy",
+      "icon": "🕊️",
+      "description": "Peace plan discussions, diplomatic meetings, ceasefire negotiations, and international mediation efforts between Ukraine, Russia, and global powers."
+    },
+    {
+      "id": "international_support",
+      "title_uk": "Міжнародна підтримка",
+      "title_en": "International Support",
+      "icon": "🤝",
+      "description": "Military aid packages, weapons deliveries, financial assistance from allies, sanctions against Russia, and security guarantee commitments."
+    },
+    {
+      "id": "ukrainians_abroad",
+      "title_uk": "Українці за кордоном",
+      "title_en": "Ukrainians Abroad",
+      "icon": "✈️",
+      "description": "News about Ukrainian refugees and diaspora including residence policies, support programs, integration challenges, legal status updates, and community life in host countries."
+    },
+    {
+      "id": "energy_crisis",
+      "title_uk": "Енергетика",
+      "title_en": "Energy Crisis",
+      "icon": "⚡",
+      "description": "Power outage schedules, energy infrastructure damage, electricity supply forecasts, and measures to maintain energy stability during the war."
+    },
+    {
+      "id": "domestic_politics",
+      "title_uk": "Внутрішня політика",
+      "title_en": "Domestic Politics",
+      "icon": "🏛️",
+      "description": "Government decisions, personnel changes, new legislation, corruption investigations, mobilization policies, and internal political developments."
+    },
+    {
+      "id": "security_warnings",
+      "title_uk": "Безпека та попередження",
+      "title_en": "Security Warnings",
+      "icon": "⚠️",
+      "description": "Fraud and scam alerts, air raid threat assessments, civil defense recommendations, and public safety announcements."
+    },
+    {
+      "id": "economy_daily_life",
+      "title_uk": "Економіка та побут",
+      "title_en": "Economy & Daily Life",
+      "icon": "💰",
+      "description": "Price and tariff changes, cost of living updates, IDP assistance programs, infrastructure services, and practical information affecting daily life."
+    },
+    {
+      "id": "eu_allied_positions",
+      "title_uk": "Позиція ЄС та союзників",
+      "title_en": "EU & Allied Positions",
+      "icon": "🇪🇺",
+      "description": "Official statements and policies from European Union, NATO allies, and partner countries regarding the war, support commitments, and diplomatic stances."
+    },
+    {
+      "id": "notable_other",
+      "title_uk": "Інше",
+      "title_en": "Notable Other",
+      "icon": "📌",
+      "description": "Significant standalone events that don't fall under any other category"
+    }
+  ]
+}

@@ -6,6 +6,7 @@ export class MongoDBStorage implements StorageService {
   private db!: Db;
   private postsCollection!: Collection<NewsPost>;
   private summariesCollection!: Collection<ProcessedSummary>;
+  private stage: string;
 
   constructor() {
     const uri = process.env.MONGODB_URI;
@@ -13,15 +14,29 @@ export class MongoDBStorage implements StorageService {
       throw new Error('MONGODB_URI environment variable is required');
     }
 
+    this.stage = process.env.STAGE || 'dev';
     this.client = new MongoClient(uri);
+  }
+
+  private getCollectionName(baseName: string): string {
+    return `${this.stage}-${baseName}`;
   }
 
   async connect(): Promise<void> {
     await this.client.connect();
     this.db = this.client.db('tg-news-summarizer');
-    this.postsCollection = this.db.collection<NewsPost>('posts');
-    this.summariesCollection =
-      this.db.collection<ProcessedSummary>('summaries');
+
+    const postsCollectionName = this.getCollectionName('posts');
+    const summariesCollectionName = this.getCollectionName('summaries');
+
+    this.postsCollection = this.db.collection<NewsPost>(postsCollectionName);
+    this.summariesCollection = this.db.collection<ProcessedSummary>(
+      summariesCollectionName
+    );
+
+    console.log(
+      `Connected to MongoDB (stage: ${this.stage}, collections: ${postsCollectionName}, ${summariesCollectionName})`
+    );
 
     // Create indexes for better performance
     await this.postsCollection.createIndex({ id: 1 }, { unique: true });
@@ -74,6 +89,22 @@ export class MongoDBStorage implements StorageService {
     }
   }
 
+  async getPostsByIds(postIds: string[]): Promise<NewsPost[]> {
+    if (postIds.length === 0) return [];
+
+    try {
+      const posts = await this.postsCollection
+        .find({ id: { $in: postIds } })
+        .toArray();
+
+      console.log(`Retrieved ${posts.length} posts by IDs`);
+      return posts;
+    } catch (error) {
+      console.error('Error getting posts by IDs:', error);
+      throw error;
+    }
+  }
+
   async saveSummary(summary: ProcessedSummary): Promise<void> {
     try {
       await this.summariesCollection.replaceOne({ id: summary.id }, summary, {
@@ -82,6 +113,23 @@ export class MongoDBStorage implements StorageService {
       console.log(`Saved summary ${summary.id} to database`);
     } catch (error) {
       console.error('Error saving summary:', error);
+      throw error;
+    }
+  }
+
+  async getSummaryById(summaryId: string): Promise<ProcessedSummary | null> {
+    try {
+      const summary = await this.summariesCollection.findOne({ id: summaryId });
+
+      if (summary) {
+        console.log(`Retrieved summary ${summaryId} from database`);
+      } else {
+        console.log(`Summary ${summaryId} not found in database`);
+      }
+
+      return summary;
+    } catch (error) {
+      console.error('Error getting summary by ID:', error);
       throw error;
     }
   }

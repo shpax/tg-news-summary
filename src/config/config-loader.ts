@@ -1,11 +1,18 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { ChannelConfig, PromptConfig } from '../types';
+import {
+  ChannelConfig,
+  PromptConfig,
+  CategoryConfig,
+  TelegraphConfig,
+} from '../types';
 
 export class ConfigLoader {
   private static instance: ConfigLoader;
   private channelConfig: ChannelConfig | null = null;
   private promptConfig: PromptConfig | null = null;
+  private categoryConfig: CategoryConfig | null = null;
+  private telegramPostTemplate: string | null = null;
 
   private constructor() {}
 
@@ -50,14 +57,16 @@ export class ConfigLoader {
           ),
           userPrompt: this.loadTemplateFile(rawConfig.summarization.userPrompt),
         },
-        postGeneration: {
-          systemPrompt: this.loadTemplateFile(
-            rawConfig.postGeneration.systemPrompt
-          ),
-          userPrompt: this.loadTemplateFile(
-            rawConfig.postGeneration.userPrompt
-          ),
-        },
+        postGeneration: rawConfig.postGeneration
+          ? {
+              systemPrompt: this.loadTemplateFile(
+                rawConfig.postGeneration.systemPrompt
+              ),
+              userPrompt: this.loadTemplateFile(
+                rawConfig.postGeneration.userPrompt
+              ),
+            }
+          : undefined,
       };
 
       return this.promptConfig;
@@ -77,8 +86,64 @@ export class ConfigLoader {
     }
   }
 
+  loadCategoryConfig(): CategoryConfig {
+    if (this.categoryConfig) {
+      return this.categoryConfig;
+    }
+
+    try {
+      const configPath = path.join(process.cwd(), 'config', 'categories.json');
+      const configData = fs.readFileSync(configPath, 'utf-8');
+      this.categoryConfig = JSON.parse(configData) as CategoryConfig;
+      return this.categoryConfig;
+    } catch (error) {
+      console.error('Error loading category config:', error);
+      throw new Error('Failed to load category configuration');
+    }
+  }
+
+  loadTelegramPostTemplate(): string {
+    if (this.telegramPostTemplate) {
+      return this.telegramPostTemplate;
+    }
+
+    try {
+      const templatePath = path.join(
+        process.cwd(),
+        'config',
+        'templates',
+        'telegram-post.hbs'
+      );
+      this.telegramPostTemplate = fs.readFileSync(templatePath, 'utf-8');
+      return this.telegramPostTemplate;
+    } catch (error) {
+      console.error('Error loading Telegram post template:', error);
+      throw new Error('Failed to load Telegram post template');
+    }
+  }
+
+  loadTelegraphConfig(): TelegraphConfig {
+    const accessToken = process.env.TELEGRAPH_ACCESS_TOKEN;
+    const authorName = process.env.TELEGRAPH_AUTHOR_NAME || '';
+    const authorUrl = process.env.TELEGRAPH_AUTHOR_URL;
+
+    if (!accessToken) {
+      throw new Error(
+        'TELEGRAPH_ACCESS_TOKEN environment variable is required'
+      );
+    }
+
+    return {
+      accessToken,
+      authorName,
+      authorUrl,
+    };
+  }
+
   reloadConfigs(): void {
     this.channelConfig = null;
     this.promptConfig = null;
+    this.categoryConfig = null;
+    this.telegramPostTemplate = null;
   }
 }

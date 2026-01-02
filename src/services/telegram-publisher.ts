@@ -15,6 +15,9 @@ export class TelegramPublisher implements PublishingService {
 
   async publishPost(content: string, channelId: string): Promise<boolean> {
     try {
+      console.log(`Attempting to publish to channel ${channelId}`);
+      console.log(`Content preview: ${content.substring(0, 100)}...`);
+
       await this.bot.sendMessage(channelId, content, {
         parse_mode: 'Markdown',
         disable_web_page_preview: false,
@@ -24,6 +27,12 @@ export class TelegramPublisher implements PublishingService {
       return true;
     } catch (error) {
       console.error(`Error publishing to channel ${channelId}:`, error);
+      // Log detailed error information
+      if (error instanceof Error) {
+        console.error(`Error name: ${error.name}`);
+        console.error(`Error message: ${error.message}`);
+        console.error(`Error stack: ${error.stack}`);
+      }
       return false;
     }
   }
